@@ -11,15 +11,6 @@ class DistillableVisionTransformer(VisionTransformer):
         self.num_classes = params['num_classes']
         
     def forward(self, img, distill_token):
-        x = self.transformer(x)
-
-        x, distill_tokens = x[:, :-1], x[:, -1]
-        x = x.mean(dim=1) if self.pool == 'mean' else x[:, 0]
-
-        x = self.to_latent(x)
-        return self.mlp_head(x), distill_tokens
-        #####################
-        #def extract_features(self, x):
         emb = self.embedding(img)  # (n, c, gh, gw)
         emb = emb.permute(0, 2, 3, 1)  # (n, gh, hw, c)
         b, h, w, c = emb.shape
@@ -34,6 +25,7 @@ class DistillableVisionTransformer(VisionTransformer):
 
         # transformer
         feat = self.transformer(emb)
+        feat, distill_tokens = x[:, :-1], x[:, -1]
 
         # classifier
         logits = self.classifier(feat[:, 0])
