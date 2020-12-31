@@ -1,56 +1,49 @@
 import torch
 import torch.nn.functional as F
 from torch import nn
-from model import VisionTransformer
-from einops import rearrange, repeat
+from vision_transformer_pytorch import VisionTransformer
 
 # classes
-class DistillMixin:
-    def forward(self, img, distill_token, mask=None):
-        p = self.patch_size()
-
-        x = rearrange(img, 'b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=p, p2=p)
-        x = self.patch_to_embedding(x)
-        b, n, _ = x.shape
-
-        cls_tokens = repeat(self.cls_token, '() n d -> b n d', b = b)
-        x = torch.cat((cls_tokens, x), dim = 1)
-        x += self.pos_embedding[:, :(n + 1)]
-
-        distill_tokens = repeat(distill_token, '() n d -> b n d', b = b)
-        x = torch.cat((x, distill_tokens), dim = 1)
-
-        x = self._attend(x, mask)
-
-        x, distill_tokens = x[:, :-1], x[:, -1]
-        x = x.mean(dim = 1) if self.pool == 'mean' else x[:, 0]
-
-        x = self.to_latent(x)
-        return self.mlp_head(x), distill_tokens
-
-class DistillableVisionTransformer(DistillMixin, VisionTransformer):
-    def __init__(self, params=None):
+class DistillableVisionTransformer(VisionTransformer):
+    def __init__(self, params):
         super(VisionTransformer, self).__init__(params)
         self.dim = params['dim']
         self.num_classes = params['num_classes']
-
-    def _attend(self, x):
-        x = self.dropout(x)
+        
+    def forward(self, img, distill_token):
         x = self.transformer(x)
-        return x
+
+        x, distill_tokens = x[:, :-1], x[:, -1]
+        x = x.mean(dim=1) if self.pool == 'mean' else x[:, 0]
+
+        x = self.to_latent(x)
+        return self.mlp_head(x), distill_tokens
+        #####################
+        #def extract_features(self, x):
+        emb = self.embedding(img)  # (n, c, gh, gw)
+        emb = emb.permute(0, 2, 3, 1)  # (n, gh, hw, c)
+        b, h, w, c = emb.shape
+        emb = emb.reshape(b, h * w, c)
+
+        # prepend class token
+        cls_token = self.cls_token.repeat(b, 1, 1)
+        emb = torch.cat([cls_token, emb], dim=1)
+        
+        distill_tokens = distill_token.repeat(b, 1, 1)
+        emb = torch.cat([emb, distill_tokens], dim=1)
+
+        # transformer
+        feat = self.transformer(emb)
+
+        # classifier
+        logits = self.classifier(feat[:, 0])
+        return logits, distill_tokens
 
 # knowledge distillation wrapper
 class DistillWrapper(nn.Module):
-    def __init__(
-        self,
-        *,
-        teacher,
-        student,
-        temperature = 1.,
-        alpha = 0.5
-    ):
+    def __init__(self, *, teacher, student, temperature=1.0, alpha=0.5):
         super().__init__()
-        assert (isinstance(student, DistillableVisionTransformer)) , 'student must be a vision transformer'
+        assert isinstance(student, DistillableVisionTransformer), 'student must be a distillable vision transformer'
 
         self.teacher = teacher
         self.student = student
@@ -67,24 +60,22 @@ class DistillWrapper(nn.Module):
             nn.Linear(dim, num_classes)
         )
 
-    def forward(self, img, labels, temperature = None, alpha = None, **kwargs):
+    def forward(self, img, labels, **kwargs):
         b, *_ = img.shape
-        alpha = alpha if alpha != None else self.alpha
-        T = temperature if temperature != None else self.temperature
 
         with torch.no_grad():
             teacher_logits = self.teacher(img)
 
-        student_logits, distill_tokens = self.student(img, distill_token = self.distillation_token, **kwargs)
+        student_logits, distill_tokens = self.student(img, distill_token=self.distillation_token, **kwargs)
         distill_logits = self.distill_mlp(distill_tokens)
 
         loss = F.cross_entropy(student_logits, labels)
 
         distill_loss = F.kl_div(
-            F.log_softmax(distill_logits / T, dim = -1),
-            F.softmax(teacher_logits / T, dim = -1).detach(),
+            F.log_softmax(distill_logits / self.temperature, dim = -1),
+            F.softmax(teacher_logits / self.temperature, dim = -1).detach(),
         reduction = 'batchmean')
 
-        distill_loss *= T ** 2
+        distill_loss *= self.temperature ** 2
 
-        return loss * alpha + distill_loss * (1 - alpha)
+        return loss * self.alpha + distill_loss * (1 - self.alpha)
