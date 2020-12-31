@@ -7,15 +7,15 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .utils import (get_width_and_height_from_size, load_pretrained_weights, get_model_params)
+from utils import (get_width_and_height_from_size, load_pretrained_weights, get_model_params)
 
 VALID_MODELS = ('ViT-B_16', 'ViT-B_32', 'ViT-L_16', 'ViT-L_32')
-
 
 class PositionEmbs(nn.Module):
     def __init__(self, num_patches, emb_dim, dropout_rate=0.1):
         super(PositionEmbs, self).__init__()
-        self.pos_embedding = nn.Parameter(torch.randn(1, num_patches + 1, emb_dim))
+        self.pos_embedding = nn.Parameter(torch.randn(1, num_patches + 2, emb_dim))
+
         if dropout_rate > 0:
             self.dropout = nn.Dropout(dropout_rate)
         else:
@@ -29,6 +29,14 @@ class PositionEmbs(nn.Module):
 
         return out
 
+class DistillationEmbs(nn.Module):
+    def __init__(self, num_patches, emb_dim):
+        super(DistillationEmbs, self).__init__()
+        self.dis_embedding = nn.Parameter(torch.randn(1, num_patches + 2, emb_dim))
+
+    def forward(self, x):
+        out = x + self.dis_embedding
+        return out
 
 class MlpBlock(nn.Module):
     """ Transformer Feed-Forward Block """
@@ -47,7 +55,6 @@ class MlpBlock(nn.Module):
             self.dropout2 = None
 
     def forward(self, x):
-
         out = self.fc1(x)
         out = self.act(out)
         if self.dropout1:
@@ -66,7 +73,7 @@ class LinearGeneral(nn.Module):
         self.weight = nn.Parameter(torch.randn(*in_dim, *feat_dim))
         self.bias = nn.Parameter(torch.zeros(*feat_dim))
 
-    def forward(self, x, dims):
+  def forward(self, x, dims):
         a = torch.tensordot(x, self.weight, dims=dims) + self.bias
         return a
 
@@ -91,7 +98,7 @@ class SelfAttention(nn.Module):
     def forward(self, x):
         b, n, _ = x.shape
 
-        q = self.query(x, dims=([2], [0]))
+q = self.query(x, dims=([2], [0]))
         k = self.key(x, dims=([2], [0]))
         v = self.value(x, dims=([2], [0]))
 
@@ -116,7 +123,7 @@ class EncoderBlock(nn.Module):
         self.norm1 = nn.LayerNorm(in_dim)
         self.attn = SelfAttention(in_dim, heads=num_heads, dropout_rate=attn_dropout_rate)
         if dropout_rate > 0:
-            self.dropout = nn.Dropout(dropout_rate)
+self.dropout = nn.Dropout(dropout_rate)
         else:
             self.dropout = None
         self.norm2 = nn.LayerNorm(in_dim)
@@ -141,7 +148,7 @@ class Encoder(nn.Module):
     def __init__(self,
                  num_patches,
                  emb_dim,
-                 mlp_dim,
+ mlp_dim,
                  num_layers=12,
                  num_heads=12,
                  dropout_rate=0.1,
@@ -150,6 +157,8 @@ class Encoder(nn.Module):
 
         # positional embedding
         self.pos_embedding = PositionEmbs(num_patches, emb_dim, dropout_rate)
+        # distillation token
+        self.dis_embedding = DistillationEmbs(num_patches, emb_dim)
 
         # encoder blocks
         in_dim = emb_dim
@@ -160,11 +169,11 @@ class Encoder(nn.Module):
         self.norm = nn.LayerNorm(in_dim)
 
     def forward(self, x):
-
         out = self.pos_embedding(x)
+        out = self.dis_embedding(out)
 
         for layer in self.encoder_layers:
-            out = layer(out)
+          out = layer(out)
 
         out = self.norm(out)
         return out
@@ -187,8 +196,8 @@ class VisionTransformer(nn.Module):
             >>> model.eval()
             >>> outputs = model(inputs)
     """
-    def __init__(self, params=None):
-        super(VisionTransformer, self).__init__()
+    def __init__(self, params=None, distill=False):
+    super(VisionTransformer, self).__init__()
         self._params = params
 
         self.embedding = nn.Conv2d(3, self._params.emb_dim, kernel_size=self.patch_size, stride=self.patch_size)
@@ -212,7 +221,7 @@ class VisionTransformer(nn.Module):
         return get_width_and_height_from_size(self._params.image_size)
 
     @property
-    def patch_size(self):
+   def patch_size(self):
         return get_width_and_height_from_size(self._params.patch_size)
 
     @property
@@ -237,7 +246,7 @@ class VisionTransformer(nn.Module):
         return feat
 
     def forward(self, x):
-        feat = self.extract_features(x)
+       feat = self.extract_features(x)
 
         # classifier
         logits = self.classifier(feat[:, 0])
@@ -262,7 +271,7 @@ class VisionTransformer(nn.Module):
         """
         cls._check_model_name_is_valid(model_name)
         params = get_model_params(model_name, override_params)
-        model = cls(params)
+      model = cls(params)
         model._change_in_channels(in_channels)
         return model
 
@@ -286,7 +295,7 @@ class VisionTransformer(nn.Module):
                     'num_heads', 'num_layers',
                     'num_classes', 'attn_dropout_rate',
                     'dropout_rate'
-        Returns:
+   Returns:
             A pretrained vision transformer model.
         """
         model = cls.from_name(model_name, num_classes=num_classes, **override_params)
@@ -310,8 +319,9 @@ class VisionTransformer(nn.Module):
         Args:
             in_channels (int): Input data's channel number.
         """
-        if in_channels != 3:
+ if in_channels != 3:
             self.embedding = nn.Conv2d(in_channels,
                                        self._params.emb_dim,
                                        kernel_size=self.patch_size,
                                        stride=self.patch_size)
+

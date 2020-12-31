@@ -129,13 +129,16 @@ def load_pretrained_weights(model, model_name, weights_path=None, load_fc=True, 
 
     if load_fc:
         ret = model.load_state_dict(state_dict, strict=False)
-        assert not ret.missing_keys, 'Missing keys when loading pretrained weights: {}'.format(ret.missing_keys)
+        #assert not ret.missing_keys, 'Missing keys when loading pretrained weights: {}'.format(ret.missing_keys)
     else:
         state_dict.pop('classifier.weight')
         state_dict.pop('classifier.bias')
+        pos_embedding = state_dict.pop('transformer.pos_embedding.pos_embedding')
+        pos_embedding = torch.cat([pos_embedding, torch.zeros(1, 1, 768)], dim=1)
         ret = model.load_state_dict(state_dict, strict=False)
-        assert set(ret.missing_keys) == set(
-            ['classifier.weight', 'classifier.bias']), 'Missing keys when loading pretrained weights: {}'.format(ret.missing_keys)
-    assert not ret.unexpected_keys, 'Missing keys when loading pretrained weights: {}'.format(ret.unexpected_keys)
+        model.pos_embedding = pos_embedding
+        #assert set(ret.missing_keys) == set(
+        #    ['classifier.weight', 'classifier.bias']), 'Missing keys when loading pretrained weights: {}'.format(ret.missing_keys)
+    #assert not ret.unexpected_keys, 'Missing keys when loading pretrained weights: {}'.format(ret.unexpected_keys)
 
     print('Loaded pretrained weights for {}'.format(model_name))

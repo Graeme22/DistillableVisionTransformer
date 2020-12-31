@@ -1,15 +1,13 @@
 import torch
 import torch.nn.functional as F
 from torch import nn
-from vision_transformer_pytorch import VisionTransformer
+from model import VisionTransformer
 
 # classes
 class DistillableVisionTransformer(VisionTransformer):
     def __init__(self, params):
-        super(VisionTransformer, self).__init__(params)
-        self.dim = params['dim']
-        self.num_classes = params['num_classes']
-        
+        super(DistillableVisionTransformer, self).__init__(params, distill=True)
+
     def forward(self, img, distill_token):
         emb = self.embedding(img)  # (n, c, gh, gw)
         emb = emb.permute(0, 2, 3, 1)  # (n, gh, hw, c)
@@ -20,11 +18,12 @@ class DistillableVisionTransformer(VisionTransformer):
         cls_token = self.cls_token.repeat(b, 1, 1)
         emb = torch.cat([cls_token, emb], dim=1)
         
+        # append distillation token
         distill_tokens = distill_token.repeat(b, 1, 1)
         emb = torch.cat([emb, distill_tokens], dim=1)
 
         # transformer
-        feat = self.transformer(emb)
+        x = self.transformer(emb)
         feat, distill_tokens = x[:, :-1], x[:, -1]
 
         # classifier
@@ -40,15 +39,15 @@ class DistillWrapper(nn.Module):
         self.teacher = teacher
         self.student = student
 
-        dim = student.dim
-        num_classes = student.num_classes
+        dim = student._params.emb_dim
+        num_classes = student._params.num_classes
         self.temperature = temperature
         self.alpha = alpha
 
         self.distillation_token = nn.Parameter(torch.randn(1, 1, dim))
 
         self.distill_mlp = nn.Sequential(
-            nn.LayerNorm(dim),
+nn.LayerNorm(dim),
             nn.Linear(dim, num_classes)
         )
 
@@ -61,6 +60,7 @@ class DistillWrapper(nn.Module):
         student_logits, distill_tokens = self.student(img, distill_token=self.distillation_token, **kwargs)
         distill_logits = self.distill_mlp(distill_tokens)
 
+        print(student_logits.shape, labels.shape)
         loss = F.cross_entropy(student_logits, labels)
 
         distill_loss = F.kl_div(
