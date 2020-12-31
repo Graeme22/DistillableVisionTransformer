@@ -1,4 +1,8 @@
-# Vision Transformer Pytorch
+# Vision Transformer Pytorch with Distillation
+Based on the paper "Training data-efficient image transformers & distillation through attention"[arXiv](https://arxiv.org/pdf/2012.12877.pdf).
+
+This repository will allow you to use distillation techniques on pretrained VisionTransformers. My motivation was to combine transfer learning of both a transformer and a state-of-the-art CNN in a way that makes more sense than just, say, an ensemble.
+
 This project is modified from [lukemelas](https://github.com/lukemelas)/[EfficientNet-PyTorch](https://github.com/lukemelas/EfficientNet-PyTorch) and [asyml](https://github.com/asyml)/[vision-transformer-pytorch](https://github.com/asyml/vision-transformer-pytorch) to provide out-of-box API for you to utilize VisionTransformer as easy as EfficientNet.
 
 ### Quickstart
