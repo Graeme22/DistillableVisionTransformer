@@ -1,12 +1,10 @@
 # MODIFIED FROM
-# https://github.com/lukemelas/EfficientNet-PyTorch/blob/master/efficientnet_pytorch/model.py
-# https://github.com/asyml/vision-transformer-pytorch/blob/main/src/model.py
+# https://github.com/tczhangzhi/VisionTransformer-Pytorch/blob/main/vision_transformer_pytorch/model.py
 
 import torch
-import numpy as np
-import torch.nn as nn
+from torch import nn
 import torch.nn.functional as F
-
+import numpy as np
 from utils import (get_width_and_height_from_size, load_pretrained_weights, get_model_params)
 
 VALID_MODELS = ('ViT-B_16', 'ViT-B_32', 'ViT-L_16', 'ViT-L_32')
@@ -65,7 +63,6 @@ class MlpBlock(nn.Module):
             out = self.dropout2(out)
         return out
 
-
 class LinearGeneral(nn.Module):
     def __init__(self, in_dim=(768, ), feat_dim=(12, 64)):
         super(LinearGeneral, self).__init__()
@@ -76,7 +73,6 @@ class LinearGeneral(nn.Module):
   def forward(self, x, dims):
         a = torch.tensordot(x, self.weight, dims=dims) + self.bias
         return a
-
 
 class SelfAttention(nn.Module):
     def __init__(self, in_dim, heads=8, dropout_rate=0.1):
@@ -114,7 +110,6 @@ q = self.query(x, dims=([2], [0]))
         out = self.out(out, dims=([2, 3], [0, 1]))
 
         return out
-
 
 class EncoderBlock(nn.Module):
     def __init__(self, in_dim, mlp_dim, num_heads, dropout_rate=0.1, attn_dropout_rate=0.1):
@@ -178,8 +173,7 @@ class Encoder(nn.Module):
         out = self.norm(out)
         return out
 
-
-class VisionTransformer(nn.Module):
+class DistillableVisionTransformer(nn.Module):
     """ Vision Transformer.
         Most easily loaded with the .from_name or .from_pretrained methods.
         Args:
@@ -196,7 +190,7 @@ class VisionTransformer(nn.Module):
             >>> model.eval()
             >>> outputs = model(inputs)
     """
-    def __init__(self, params=None, distill=False):
+    def __init__(self, **kwargs):
     super(VisionTransformer, self).__init__()
         self._params = params
 
@@ -231,8 +225,8 @@ class VisionTransformer(nn.Module):
         gh, gw = h // fh, w // fw
         return gh * gw
 
-    def extract_features(self, x):
-        emb = self.embedding(x)  # (n, c, gh, gw)
+    def forward(self, img, distill_token):
+        emb = self.embedding(img)  # (n, c, gh, gw)
         emb = emb.permute(0, 2, 3, 1)  # (n, gh, hw, c)
         b, h, w, c = emb.shape
         emb = emb.reshape(b, h * w, c)
@@ -240,17 +234,18 @@ class VisionTransformer(nn.Module):
         # prepend class token
         cls_token = self.cls_token.repeat(b, 1, 1)
         emb = torch.cat([cls_token, emb], dim=1)
+        
+        # append distillation token
+        distill_tokens = distill_token.repeat(b, 1, 1)
+        emb = torch.cat([emb, distill_tokens], dim=1)
 
         # transformer
-        feat = self.transformer(emb)
-        return feat
-
-    def forward(self, x):
-       feat = self.extract_features(x)
+        x = self.transformer(emb)
+        feat, distill_tokens = x[:, :-1], x[:, -1]
 
         # classifier
         logits = self.classifier(feat[:, 0])
-        return logits
+        return logits, distill_tokens
 
     @classmethod
     def from_name(cls, model_name, in_channels=3, **override_params):
@@ -325,3 +320,44 @@ class VisionTransformer(nn.Module):
                                        kernel_size=self.patch_size,
                                        stride=self.patch_size)
 
+# knowledge distillation wrapper
+class DistillWrapper(nn.Module):
+    def __init__(self, *, teacher, student, temperature=1.0, alpha=0.5):
+        super().__init__()
+        assert isinstance(student, DistillableVisionTransformer), 'student must be a DistillableVisionTransformer'
+
+        self.teacher = teacher
+        self.student = student
+
+        dim = student._params.emb_dim
+        num_classes = student._params.num_classes
+        self.temperature = temperature
+        self.alpha = alpha
+
+        self.distillation_token = nn.Parameter(torch.randn(1, 1, dim))
+
+        self.distill_mlp = nn.Sequential(
+nn.LayerNorm(dim),
+            nn.Linear(dim, num_classes)
+        )
+
+    def forward(self, img, labels, **kwargs):
+        b, *_ = img.shape
+
+        with torch.no_grad():
+            teacher_logits = self.teacher(img)
+
+        student_logits, distill_tokens = self.student(img, distill_token=self.distillation_token, **kwargs)
+        distill_logits = self.distill_mlp(distill_tokens)
+
+        print(student_logits.shape, labels.shape)
+        loss = F.cross_entropy(student_logits, labels)
+
+        distill_loss = F.kl_div(
+            F.log_softmax(distill_logits / self.temperature, dim = -1),
+            F.softmax(teacher_logits / self.temperature, dim = -1).detach(),
+        reduction = 'batchmean')
+
+        distill_loss *= self.temperature ** 2
+
+        return loss * self.alpha + distill_loss * (1 - self.alpha)
