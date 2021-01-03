@@ -1,7 +1,7 @@
 # PyTorch Vision Transformers with Distillation
 Based on the paper "[Training data-efficient image transformers & distillation through attention](https://arxiv.org/pdf/2012.12877.pdf)".
 
-This repository will allow you to use distillation techniques with vision transformers in PyTorch. Most importantly, you can use pretrained models for either the teacher, the student, or even both. My motivation was to use transfer learning to decrease the amount of resources it takes to train an vision transformer.
+This repository will allow you to use distillation techniques with vision transformers in PyTorch. Most importantly, you can use pretrained models for the teacher, the student, or even both! My motivation was to use transfer learning to decrease the amount of resources it takes to train a vision transformer.
 
 ### Quickstart
 
