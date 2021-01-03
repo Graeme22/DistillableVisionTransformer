@@ -26,7 +26,6 @@ def get_model_params(model_name):
     Returns:
         Dictionary containing parameters
     '''
-
     params_dict = {
         'ViT-B_16': (384, 16, 768, 3072, 12, 12, 1000, 0.0, 0.1),
         'ViT-B_32': (384, 32, 768, 3072, 12, 12, 1000, 0.0, 0.1),
@@ -47,7 +46,7 @@ def get_model_params(model_name):
         dropout_rate=dropout_rate
     )
 
-def load_pretrained_weights(model, model_name, weights_path=None, load_fc=True, advprop=False):
+def load_pretrained_weights(model, model_name, weights_path=None, load_fc=True):
     '''
     Loads pretrained weights from weights path or download using url.
     Args:
@@ -58,7 +57,6 @@ def load_pretrained_weights(model, model_name, weights_path=None, load_fc=True, 
             None: use pretrained weights downloaded from the Internet.
         load_fc (bool): Whether to load pretrained weights for fc layer at the end of the model.
     '''
-
     if weights_path != None:
         state_dict = torch.load(weights_path)
     else:
