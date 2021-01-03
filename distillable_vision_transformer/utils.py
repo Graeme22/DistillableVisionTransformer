@@ -27,10 +27,10 @@ def get_model_params(model_name):
         Dictionary containing parameters
     '''
     params_dict = {
-        'ViT-B_16': (384, 16, 768, 3072, 12, 12, 1000, 0.0, 0.1),
-        'ViT-B_32': (384, 32, 768, 3072, 12, 12, 1000, 0.0, 0.1),
-        'ViT-L_16': (384, 16, 1024, 4096, 16, 24, 1000, 0.0, 0.1),
-        'ViT-L_32': (384, 32, 1024, 4096, 16, 24, 1000, 0.0, 0.1)
+        'ViT-B_16': ((384, 384), 16, 768, 3072, 12, 12, 1000, 0.0, 0.1),
+        'ViT-B_32': ((384, 384), 32, 768, 3072, 12, 12, 1000, 0.0, 0.1),
+        'ViT-L_16': ((384, 384), 16, 1024, 4096, 16, 24, 1000, 0.0, 0.1),
+        'ViT-L_32': ((384, 384), 32, 1024, 4096, 16, 24, 1000, 0.0, 0.1)
     }
     image_size, patch_size, emb_dim, mlp_dim, num_heads, num_layers, num_classes, attn_dropout_rate, dropout_rate = params_dict[model_name]
 
@@ -66,7 +66,7 @@ def load_pretrained_weights(model, model_name, weights_path=None, load_fc=True):
         state_dict.pop('classifier.bias')
 
     # concatenate empty space for distillation token
-    state_dict['transformer.pos_embedding.pos_embedding'] = torch.cat([state_dict['transformer.pos_embedding.pos_embedding'], torch.zeros(1, 1, model._params.emb_dim)], dim=1)
+    state_dict['transformer.pos_embedding.pos_embedding'] = torch.cat([state_dict['transformer.pos_embedding.pos_embedding'], torch.zeros(1, 1, model.emb_dim)], dim=1)
     model.load_state_dict(state_dict, strict=False)
 
     print('Loaded pretrained weights for {}'.format(model_name))

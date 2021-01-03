@@ -169,12 +169,12 @@ class DistillableVisionTransformer(nn.Module):
     Example:
         >>> import torch
         >>> from distillable_vision_transformer import DistillableVisionTransformer
-        >>> inputs = torch.rand(1, 3, 256, 256)
+        >>> inputs = torch.rand(1, 3, 384, 384)
         >>> model = DistillableVisionTransformer.from_pretrained('ViT-B_16')
         >>> model.eval()
         >>> outputs, _ = model(inputs)
     '''
-    def __init__(self, in_channels=3, image_size=384, patch_size=16, emb_dim=768, mlp_dim=3072, num_heads=12, num_layers=12, num_classes=1000, attn_dropout_rate=0.0, dropout_rate=0.1):
+    def __init__(self, in_channels=3, image_size=(384, 384), patch_size=16, emb_dim=768, mlp_dim=3072, num_heads=12, num_layers=12, num_classes=1000, attn_dropout_rate=0.0, dropout_rate=0.1):
         super(DistillableVisionTransformer, self).__init__()
         self.in_channels = in_channels
         self.image_size = image_size
@@ -196,8 +196,7 @@ class DistillableVisionTransformer(nn.Module):
     @property
     def num_patches(self):
         h, w = self.image_size
-        fh, fw = self.patch_size
-        gh, gw = h // fh, w // fw
+        gh, gw = h // self.patch_size, w // self.patch_size
         return gh * gw
 
     def forward(self, img):
@@ -238,7 +237,8 @@ class DistillableVisionTransformer(nn.Module):
             A distillable vision transformer model.
         '''
         cls._check_model_name_is_valid(model_name)
-        params = get_model_params(model_name, override_params)
+        params = get_model_params(model_name)
+        params.update(override_params)
         model = cls(**params)
         return model
 
