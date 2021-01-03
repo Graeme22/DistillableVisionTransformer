@@ -14,13 +14,13 @@ from shutil import rmtree
 from setuptools import find_packages, setup, Command
 
 # Package meta-data.
-NAME = 'vision_transformer_pytorch'
-DESCRIPTION = 'VisionTransformer implemented in PyTorch.'
-URL = 'https://github.com/tczhangzhi/VisionTransformer-PyTorch'
-EMAIL = 'zhangzhi2018@email.szu.edu.cn'
-AUTHOR = 'ZHANG Zhi'
+NAME = 'distillable_vision_transformer'
+DESCRIPTION = 'A PyTorch vision transformer for distillation.'
+URL = 'https://github.com/Graeme22/DistillableVisionTransformer'
+EMAIL = 'gholliday2@hotmail.com'
+AUTHOR = 'Graeme Holliday'
 REQUIRES_PYTHON = '>=3.5.0'
-VERSION = '1.0.2'
+VERSION = '1.0.0'
 
 # What packages are required for this module to be executed?
 REQUIRED = [

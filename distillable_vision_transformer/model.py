@@ -6,7 +6,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 import numpy as np
-from utils import load_pretrained_weights, get_model_params
+from .utils import load_pretrained_weights, get_model_params
 
 VALID_MODELS = ('ViT-B_16', 'ViT-B_32', 'ViT-L_16', 'ViT-L_32')
 
