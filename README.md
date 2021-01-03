@@ -1,7 +1,7 @@
-# Vision Transformer Pytorch with Distillation
+# PyTorch Vision Transformers with Distillation
 Based on the paper "[Training data-efficient image transformers & distillation through attention](https://arxiv.org/pdf/2012.12877.pdf)".
 
-This repository will allow you to use distillation techniques on pretrained VisionTransformers. My motivation was to combine transfer learning of both a transformer and a state-of-the-art CNN in a way that makes more sense than just, say, an ensemble.
+This repository will allow you to use distillation techniques with vision transformers in PyTorch. Most importantly, you can use pretrained models for either the teacher, the student, or even both. My motivation was to use transfer learning to decrease the amount of resources it takes to train an vision transformer.
 
 ### Quickstart
 
@@ -61,7 +61,7 @@ Default hyper parameters:
 If you need to modify these hyperparameters, just overwrite them:
 
 ```
-model = DistillableVisionTransformer.from_name('ViT-B_16', image_size=256, patch_size=64, ...)
+model = DistillableVisionTransformer.from_name('ViT-B_16', patch_size=64, emb_dim=2048, ...)
 ```
 
 ### Contributing
